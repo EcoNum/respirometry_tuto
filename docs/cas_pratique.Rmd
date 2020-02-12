@@ -1,0 +1,96 @@
+---
+title: "Cas pratique"
+author: "Engels Guyliann"
+date: "2/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+SciViews::R
+source("../R/function.R")
+```
+
+```{r}
+orga <- tribble(
+    ~ organisme, ~masse, ~nb,
+   "Holothuria forskali",  74.85, 1,
+   "Ophiura textura",  2.72, 1,
+   "Patella vulgata", 28.37, 3,
+   "Posidonia oceanica", 73.83, 1,
+   "Sphaerococcus coronopifolius", 21.83 , 1,
+   "microorganismes", NA, NA
+)
+```
+
+Chaque respiromètre comprend un organisme différents présenté dans le tableau ci-dessous
+
+```{r}
+knitr::kable(orga, col.names = c("Organisme", "Masse", "Nombre"))
+```
+
+```{r}
+respi <- read("../data/respiro.rds") %>.%
+  select(., ends_with("N"), contains("Time"))
+```
+
+# Le cas pratique d' *Holothuria forskali*
+
+Dans l'exemple, nous utilisons *Holothuria forskali*.
+
+```{r}
+# Choice of the series, and indication of mass and ref.respi
+series <- "O2_1N"
+mass <- 74.85 #g
+ref.respi <- -0.01
+title <- "Holothuria forskali"
+n1 <- 1
+```
+
+Le graphique ci-dessous propose la variation de l'oxygène dissous au cours du temps. Avec la fonction identify(), il est possible de venir pointer des zone d'intéret sur le graphique.
+
+```{r}
+plot(respi$Time, respi[[series]], type = "l", xlab = "Time",  ylab = "[O2] mg/L")
+# La fonction identify ne s'utilise pas dans les rmd mais dans les script R ou dans la console R
+# La sauvegarde des position est très important
+#pos <- identify(respi$Time, respi[[series]])
+```
+
+Il est très important de vérifier chaque cycle un à un.
+
+```{r}
+respirometry(respi, series, pos = as.integer(c(35, 131)), n = n1, mass = mass, ref.respi = ref.respi, main = title)
+#respirometry(respi, series, pos, n = n1, mass = mass, ref.respi = ref.respi, main = title)
+#respirometry(respi, series, pos, n = n1+1, mass = mass, ref.respi = ref.respi, main = title)
+#respirometry(respi, series, pos, n = n1+2, mass = mass, ref.respi = ref.respi, main = title)
+```
+
+Après avoir sélectionné l'ensemble des cycle intéressants à l'aide de identify(), il est important de sauvegarder les positions intéressantes.
+
+```{r}
+#position <- tibble::tibble(Posi = pos, Time = respi$Time[pos])
+#data.io::write(position, file = "../data/cas_position.rds", type = "rds")
+position <- data.io::read("../data/cas_position.rds", type ="rds")
+```
+
+```{r}
+plot(respi$Time, respi[[series]], type = "l", xlab = "Time",  ylab = "[O2] mg/L")
+abline(v = position$Time)
+```
+
+Lorsque tous les cycles sont sélectionnés et vérifiés, on va réaliser une boucle afin d'importer toutes les valeurs de respiration d'un coup
+
+```{r, eval=FALSE}
+len <- (length(position$Posi)/2) - 1
+res <- respirometry(respi, series, position$Posi, n = n1, mass = mass, ref.respi = ref.respi, main = title)
+for(i in 1:len) {
+  res1 <- respirometry(respi, series, position$Posi, n = (n1 + i), mass = mass, ref.respi = ref.respi, main = title)
+  res <- bind_rows(res, res1)
+}
+write$rds(res, file = "../data/cas_result.rds")
+```
+
+```{r}
+knitr::kable(read("../data/cas_result.rds"))
+```
+
