@@ -1,0 +1,122 @@
+---
+title: "Utilisation des fonctions aux données obtenue avec l'IKS"
+output: html_document
+---
+
+```{r}
+source("../R/function.R")
+```
+
+# Exemple de correction de données obtenues avec l'IKS
+
+En partant d'un jeu de données fictif sur la mesure du pH en continu, nous obtenons le graphique suivant :
+
+```{r}
+# Exemple
+# Correction du pH mesuré en continu à partir de mesures quotidiennes
+pH <- rep(8.1, 24 * 3 + 1) + sin((1:(24 * 3 + 1)) / 2)/10 +
+ rnorm(24 * 3 + 1, mean = 0, sd = 0.02)
+# Transformation en série temporelle, en tenant compte du temps écoulé
+# Mesures toutes les heures:
+dates <- Sys.time() + 1:(24 * 3 + 1) * 3600
+# Unité temporelle = 1 jour
+pH.ts <- ts(pH, start = 0, frequency = 24)
+plot(pH.ts)
+
+```
+
+Afin d'avoir une plus haute précision, des mesures sont prises avec un instruments de plus haute précision. 
+
+```{r}
+## Etalonnage quotidien
+pH2 <- c(8.12, 8.07, 8.05, 7.98)
+dates2 <- Sys.time() + 0:3 * (24 * 3600)
+pH2.ts <- ts(pH2, start = 0, frequency = 1)
+plot(pH2.ts)
+```
+
+Il est donc possible de superposer les données de l'iks avec les données avec les données obtenues avec l'instruments plus précis
+
+```{r}
+plot(dates, pH, type = "l")
+lines(dates2, pH2, col = "red")
+lines(dates2, pH2, col = "red", type = "p")
+```
+
+La fonction correct monitoring va permettre d'appliquer la correction des données iks.
+
+```{r}
+pHcorr <- correct_monitoring(dates, pH, dates2, pH2, extrapolate = TRUE)
+plot(pHcorr)
+```
+
+La fonction correct_monitoring comprend commes arguments :
+
+- dates : Temps de l'IKS mesuré avec l'ordinateur
+- values : valeur mesuréepar l'IKS (oxygène, pH,...)
+- calib.dates: Temps lors de prise des paramètres avec un instruement de plus haute précision.
+- calib.values: Valeur mesurée avec l'instruments de précision.
+- extrapolate : cet argument est à FALSE par défaut. Il permet de spécifier si l'on souhaite uniquement être dnas les bornes mesurées avec l'instruments de précision.
+
+# Mesure de taux de respiration via les données fournies pour l'IKS
+
+La fonction respirometry() permet de calculer la respiration d'individus avec les arguments suivants : 
+
+```{r}
+# Example of use: read data for two consecutive days
+datarespi <- rbind(readRDS("../data/IKS.Data.2017-05-01.rds"),
+                   readRDS("../data/IKS.Data.2017-05-02.rds"))
+
+# Choice of the series, and indication of mass and ref.respi
+series <- "O2mgL_4"
+mass <- 74 #g
+ref.respi <- -0.01
+title <- "Etoile de mer"
+n1 <- 1
+```
+
+Les arguments de la fonction respirometry sont les suivants :
+
+- data : Jeu de données
+- series : Nom de la séries analysées
+- pos : Provient de la série de nombre caculé via la fonction identify. Pour spécifier le début de chaque période.
+- n : 
+- mass : Masse de la bouture
+- vol.respi : volume du respiromètre
+- ref.respi : Correction faites sur la respiromètre ? 
+- main :  Titre du graphique ??
+
+```{r}
+plot(datarespi$Time, datarespi[[series]], type = "l", xlab = "Time",  ylab = "[O2] mg/L")
+```
+Ensuite, vous devez venir sélectionner les zones d'intérêt avec la fonction identify() mais atteniton que vous devez garder les positions 
+
+```{r}
+# La fonction pos s'exécute dans un script R de préférence
+#plot(datarespi$Time, datarespi[[series]], type = "l", xlab = "Time",  ylab = "[O2] mg/L")
+#pos <- identify(datarespi$Time, datarespi[[series]])
+
+# Sauvegarde du vecteur 
+#pos
+#position <- tibble::data_frame(Posi = pos, Time = datarespi$Time[pos])
+#data.io::write(position, file = "data/position.rds", type = "rds")
+position <- data.io::read("../data/position.rds", type ="rds")
+```
+
+```{r}
+plot(datarespi$Time, datarespi[[series]], type = "l", xlab = "Time",  ylab = "[O2] mg/L")
+abline(v = position$Time)
+```
+
+```{r}
+#res <- respirometry(datarespi, series, position$Posi, n = n1, mass = mass, ref.respi = ref.respi, main = title)
+#res <- rbind(res, respirometry(datarespi, series, position$Posi, n = n1+1, mass = mass, ref.respi = ref.respi, main = title))
+```
+
+On produit un jeu de données ligne par ligne avec le calcul de la respiration. Il faut également sauver ce fichier
+
+```{r}
+#data.io::write(res, file = "data/respirometry.rds", type = "rds")
+(res <- data.io::read("../data/respirometry.rds", type = "rds"))
+```
+
